@@ -1,11 +1,23 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const router = express.Router();
 const Item = require('../models/Item');
+
+// Helper: validate a Mongo ObjectId parameter
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
 
 // GET /api/items - Fetch all items (with search & pagination)
 router.get('/', async (req, res) => {
   try {
-    const { search, page = 1, limit = 5 } = req.query;
+    const { search } = req.query;
+
+    // Validate pagination params
+    let pageNum = parseInt(req.query.page, 10) || 1;
+    let limitNum = parseInt(req.query.limit, 10) || 5;
+
+    if (pageNum < 1) pageNum = 1;
+    if (limitNum < 1) limitNum = 5;
+    if (limitNum > 100) limitNum = 100;
 
     // Build filter
     let filter = {};
@@ -16,8 +28,6 @@ router.get('/', async (req, res) => {
       };
     }
 
-    const pageNum = parseInt(page);
-    const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
     const [items, total] = await Promise.all([
@@ -29,10 +39,29 @@ router.get('/', async (req, res) => {
       items,
       total,
       page: pageNum,
+      limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
     });
   } catch (err) {
     console.error('Error fetching items:', err.message);
+    res.status(500).json({ message: 'Server Error' });
+  }
+});
+
+// GET /api/items/:id - Fetch a single item
+router.get('/:id', async (req, res) => {
+  try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid item id' });
+    }
+
+    const item = await Item.findById(req.params.id);
+    if (!item) {
+      return res.status(404).json({ message: 'Item not found' });
+    }
+    res.json(item);
+  } catch (err) {
+    console.error('Error fetching item:', err.message);
     res.status(500).json({ message: 'Server Error' });
   }
 });
@@ -60,6 +89,10 @@ router.put('/:id', async (req, res) => {
   try {
     const { name, description } = req.body;
 
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid item id' });
+    }
+
     if (!name || !description) {
       return res.status(400).json({ message: 'Name and description are required' });
     }
@@ -84,6 +117,10 @@ router.put('/:id', async (req, res) => {
 // DELETE /api/items/:id - Delete an item
 router.delete('/:id', async (req, res) => {
   try {
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid item id' });
+    }
+
     const deletedItem = await Item.findByIdAndDelete(req.params.id);
     if (!deletedItem) {
       return res.status(404).json({ message: 'Item not found' });

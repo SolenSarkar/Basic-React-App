@@ -15,9 +15,18 @@ app.use(express.json());
 // Routes
 app.use('/api/items', itemsRouter);
 
-// Health check
+// Health check / API overview
 app.get('/', (req, res) => {
-  res.json({ message: 'MERN API is running!' });
+  res.json({
+    message: 'MERN API is running!',
+    endpoints: {
+      'GET /api/items': 'List all items (supports ?search=&page=&limit=)',
+      'GET /api/items/:id': 'Fetch a single item by id',
+      'POST /api/items': 'Create a new item (body: { name, description })',
+      'PUT /api/items/:id': 'Update an item (body: { name, description })',
+      'DELETE /api/items/:id': 'Delete an item',
+    },
+  });
 });
 
 // Connect to MongoDB and start server
@@ -31,8 +40,18 @@ mongoose
   })
   .then(() => {
     console.log('✅ Connected to MongoDB Atlas');
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
+    });
+
+    // Graceful shutdown on Ctrl+C (SIGINT)
+    process.on('SIGINT', async () => {
+      console.log('\n👋 Shutting down gracefully...');
+      server.close(async () => {
+        await mongoose.connection.close();
+        console.log('🔌 MongoDB connection closed');
+        process.exit(0);
+      });
     });
   })
   .catch((err) => {

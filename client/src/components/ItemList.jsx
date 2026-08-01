@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 function ItemList() {
   const [items, setItems] = useState([]);
@@ -9,6 +9,10 @@ function ItemList() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Client-side validation state
+  const [formErrors, setFormErrors] = useState({});
+  const [editErrors, setEditErrors] = useState({});
 
   // Search state
   const [search, setSearch] = useState('');
@@ -25,6 +29,24 @@ function ItemList() {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Toast / success feedback
+  const [toast, setToast] = useState(null);
+  const toastTimer = useRef(null);
+
+  // Show an auto-dismissing toast message
+  const showToast = useCallback((message, type = 'success') => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, type });
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  // Clear toast on unmount
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
 
   // Fetch items from the API
   const fetchItems = useCallback(async (searchTerm = '', pageNum = 1) => {
@@ -52,6 +74,17 @@ function ItemList() {
     fetchItems();
   }, [fetchItems]);
 
+  // Validate a new-item field
+  const validateField = (field, value) => {
+    if (!value.trim()) {
+      return `${field === 'name' ? 'Name' : 'Description'} is required`;
+    }
+    if (value.trim().length < 3) {
+      return `${field === 'name' ? 'Name' : 'Description'} must be at least 3 characters`;
+    }
+    return '';
+  };
+
   // Handle search
   const handleSearch = (e) => {
     e.preventDefault();
@@ -69,23 +102,34 @@ function ItemList() {
   // Handle form submission to create a new item
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !description.trim()) return;
+    const nameErr = validateField('name', name);
+    const descErr = validateField('description', description);
+
+    if (nameErr || descErr) {
+      setFormErrors({ name: nameErr, description: descErr });
+      return;
+    }
+    setFormErrors({});
 
     try {
       setSubmitting(true);
       const res = await fetch('/api/items', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
       });
 
-      if (!res.ok) throw new Error('Failed to create item');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to create item');
+      }
 
       const newItem = await res.json();
       setItems((prev) => [newItem, ...prev]);
       setTotal((prev) => prev + 1);
       setName('');
       setDescription('');
+      showToast('✅ Item added successfully!');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -94,12 +138,31 @@ function ItemList() {
   };
 
   // Handle deleting an item
-  const handleDelete = async (id) => {
+  const handleDelete = async (id, itemName) => {
+    if (!window.confirm(`Are you sure you want to delete "${itemName}"?`)) {
+      return;
+    }
+
     try {
       const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed to delete item');
-      setItems((prev) => prev.filter((item) => item._id !== id));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to delete item');
+      }
+
+      const remaining = items.filter((item) => item._id !== id);
+      setItems(remaining);
       setTotal((prev) => prev - 1);
+
+      // Pagination edge case: if the current page is now empty and we're
+      // not on the first page, move back one page.
+      if (remaining.length === 0 && page > 1) {
+        fetchItems(search, page - 1);
+      } else {
+        setTotalPages((prev) => (remaining.length === 0 && prev > 1 ? prev - 1 : prev));
+      }
+
+      showToast('🗑️ Item deleted successfully!');
     } catch (err) {
       setError(err.message);
     }
@@ -110,6 +173,7 @@ function ItemList() {
     setEditingId(item._id);
     setEditName(item.name);
     setEditDescription(item.description);
+    setEditErrors({});
   };
 
   // Cancel editing
@@ -117,27 +181,39 @@ function ItemList() {
     setEditingId(null);
     setEditName('');
     setEditDescription('');
+    setEditErrors({});
   };
 
   // Save edited item
   const handleSaveEdit = async (id) => {
-    if (!editName.trim() || !editDescription.trim()) return;
+    const nameErr = validateField('name', editName);
+    const descErr = validateField('description', editDescription);
+
+    if (nameErr || descErr) {
+      setEditErrors({ name: nameErr, description: descErr });
+      return;
+    }
+    setEditErrors({});
 
     try {
       setSaving(true);
       const res = await fetch(`/api/items/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editName, description: editDescription }),
+        body: JSON.stringify({ name: editName.trim(), description: editDescription.trim() }),
       });
 
-      if (!res.ok) throw new Error('Failed to update item');
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || 'Failed to update item');
+      }
 
       const updatedItem = await res.json();
       setItems((prev) =>
         prev.map((item) => (item._id === id ? updatedItem : item))
       );
       cancelEdit();
+      showToast('💾 Item updated successfully!');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -152,6 +228,13 @@ function ItemList() {
 
   return (
     <div>
+      {/* --- Toast Message --- */}
+      {toast && (
+        <div className={`toast toast-${toast.type}`} role="status">
+          {toast.message}
+        </div>
+      )}
+
       {/* --- Search Bar --- */}
       <form className="search-form" onSubmit={handleSearch}>
         <input
@@ -169,20 +252,22 @@ function ItemList() {
       </form>
 
       {/* --- Add Item Form --- */}
-      <form className="item-form" onSubmit={handleSubmit}>
+      <form className="item-form" onSubmit={handleSubmit} noValidate>
         <input
           type="text"
           placeholder="Item name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          required
         />
+        {formErrors.name && <span className="field-error">{formErrors.name}</span>}
         <textarea
           placeholder="Item description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          required
         />
+        {formErrors.description && (
+          <span className="field-error">{formErrors.description}</span>
+        )}
         <button type="submit" disabled={submitting}>
           {submitting ? 'Adding...' : '➕ Add Item'}
         </button>
@@ -217,11 +302,17 @@ function ItemList() {
                     onChange={(e) => setEditName(e.target.value)}
                     placeholder="Item name"
                   />
+                  {editErrors.name && (
+                    <span className="field-error">{editErrors.name}</span>
+                  )}
                   <textarea
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
                     placeholder="Item description"
                   />
+                  {editErrors.description && (
+                    <span className="field-error">{editErrors.description}</span>
+                  )}
                   <div className="edit-actions">
                     <button
                       className="save-btn"
@@ -230,7 +321,11 @@ function ItemList() {
                     >
                       {saving ? 'Saving...' : '💾 Save'}
                     </button>
-                    <button className="cancel-btn" onClick={cancelEdit}>
+                    <button
+                      className="cancel-btn"
+                      onClick={cancelEdit}
+                      disabled={saving}
+                    >
                       Cancel
                     </button>
                   </div>
@@ -250,7 +345,7 @@ function ItemList() {
                       </button>
                       <button
                         className="delete-btn"
-                        onClick={() => handleDelete(item._id)}
+                        onClick={() => handleDelete(item._id, item.name)}
                         title="Delete item"
                       >
                         🗑️
@@ -276,7 +371,7 @@ function ItemList() {
         {totalPages > 1 && (
           <div className="pagination">
             <button
-              disabled={page <= 1}
+              disabled={page <= 1 || loading}
               onClick={() => goToPage(page - 1)}
             >
               ◀ Prev
@@ -287,13 +382,14 @@ function ItemList() {
                   key={pageNum}
                   className={pageNum === page ? 'active' : ''}
                   onClick={() => goToPage(pageNum)}
+                  disabled={loading}
                 >
                   {pageNum}
                 </button>
               )
             )}
             <button
-              disabled={page >= totalPages}
+              disabled={page >= totalPages || loading}
               onClick={() => goToPage(page + 1)}
             >
               Next ▶

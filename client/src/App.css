@@ -380,6 +380,54 @@ body {
   transform: none;
 }
 
+/* ===== Toast Messages ===== */
+.toast {
+  position: fixed;
+  top: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  padding: 0.9rem 1.6rem;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+  animation: toast-in 0.3s ease;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.toast-success {
+  background: #22c55e;
+  color: #fff;
+}
+
+.toast-error {
+  background: #e74c3c;
+  color: #fff;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* ===== Field Validation Errors ===== */
+.field-error {
+  display: block;
+  color: #e74c3c;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-top: -0.5rem;
+  padding-left: 0.25rem;
+}
+
 /* ===== Responsive ===== */
 @media (max-width: 600px) {
   .app {
