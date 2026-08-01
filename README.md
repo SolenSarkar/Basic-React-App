@@ -147,7 +147,7 @@ curl -X POST http://localhost:5000/api/items \
 | `npm run install-all`| Install root + server + client dependencies      |
 | `node server/seed.js`| Seed the database with sample items              |
 
-## 🧰 Troubleshooting 
+## 🧰 Troubleshooting  
 
 - **MongoDB connection errors** — verify `MONGODB_URI` in `server/.env`, and that your Atlas IP allowlist includes your current IP.
 - **SSL handshake issues on Windows** — the server already enables `tlsAllowInvalidCertificates` to handle this.
