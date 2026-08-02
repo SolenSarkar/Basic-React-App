@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 
+// API base URL:
+// - If VITE_API_URL is set (e.g. a hosted backend on Render/Railway), use it.
+// - Otherwise fall back to a relative '/api' path (works in local dev via the
+//   Vite proxy to http://localhost:5000).
+const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
+
 function ItemList() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,7 +61,7 @@ function ItemList() {
       setError(null);
       const params = new URLSearchParams({ page: pageNum, limit });
       if (searchTerm) params.set('search', searchTerm);
-      const res = await fetch(`/api/items?${params}`);
+      const res = await fetch(`${API_URL}/items?${params}`);
       if (!res.ok) throw new Error('Failed to fetch items');
       const data = await res.json();
       setItems(data.items);
@@ -113,7 +119,7 @@ function ItemList() {
 
     try {
       setSubmitting(true);
-      const res = await fetch('/api/items', {
+      const res = await fetch(`${API_URL}/items`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), description: description.trim() }),
@@ -144,7 +150,7 @@ function ItemList() {
     }
 
     try {
-      const res = await fetch(`/api/items/${id}`, { method: 'DELETE' });
+      const res = await fetch(`${API_URL}/items/${id}`, { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.message || 'Failed to delete item');
@@ -197,7 +203,7 @@ function ItemList() {
 
     try {
       setSaving(true);
-      const res = await fetch(`/api/items/${id}`, {
+      const res = await fetch(`${API_URL}/items/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editName.trim(), description: editDescription.trim() }),

@@ -1,0 +1,48 @@
+name: Deploy to GitHub Pages
+
+on:
+  # Trigger on pushes to the main branch
+  push:
+    branches:
+      - main
+  # Allow manual trigger from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install client dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build client
+        working-directory: client
+        run: npm run build
+        env:
+          # Optional: point the frontend at a hosted backend API.
+          # Set this secret in GitHub repo Settings -> Secrets and variables -> Actions
+          # (e.g. https://my-api.onrender.com)
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./client/dist
+          publish_branch: gh-pages
+          # Set to false to keep full commit history of the gh-pages branch
+          keep_history: false
+

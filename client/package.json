@@ -3,18 +3,22 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "homepage": "https://SolenSarkar.github.io/Basic-React-App",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "mern-app": "file:..",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
+    "gh-pages": "^6.1.1",
     "vite": "^5.4.2"
   }
 }
-
